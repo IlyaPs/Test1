@@ -1,0 +1,70 @@
+﻿<html><head><meta charset="utf-8" /><title></title><style> #map { height: 100%; } html, body { height: 100%; margin: 0; padding: 0; }</style></head>
+<body>
+    <div id="map"></div> <!-- Прямоугольник для отображения карты. -->
+
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>                              <!-- Подключить библиотеки: jquery, -->
+    <script type="text/javascript" src="https://maps.google.com/maps/api/js?key=AIzaSyBhkrhxJU_DolyWn_HTy3DrjX-H6xCbsYk&sensor=false"></script>  <!-- и карт гугл, используя ключ доступа. --> 
+
+    <script>
+        var user;                                                                          // Идентификатор пользователя.
+        while ((user == null) || (user == "")) user = prompt("Введите логин", "Moroz");    // Запросить у пользователя идентификатор.
+        
+        var pos;                                                                                // Координаты пользователя.
+        var map = new google.maps.Map(document.getElementById("map"), { zoom: 17 });            // Отобразить карту гугл.
+
+        var image = {
+            url: 'ico.svg',
+            anchor: new google.maps.Point(350, 350),
+            size: new google.maps.Size(700, 700),
+        };
+
+        var marker = new google.maps.Marker({ map: map, icon: image });                         // Картинка других пользователей.
+
+        var hl = {
+            url: 'usr.svg',
+            anchor: new google.maps.Point(25, 50),
+            size: new google.maps.Size(50, 50),
+        };
+
+        var UsersMarkers = {};                                                                  // Ассоциативный массив маркеров пользователей.
+
+        navigator.geolocation.watchPosition(function (position) {                               // Получить 
+            pos = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);  // координаты пользователя.
+            map.setCenter(pos);                                                                 // Выставить карту 
+            marker.setPosition(pos);                                                            // и маркер по этим координатам.
+            $.get("/WebService.asmx/setUser"                                                    // Отправить в Web-сервис хранения координат
+                + "?usr=" + user                                                                // идентификатор пользователя
+                + "&lat=" + position.coords.latitude                                            // и новые ее координаты: широта
+                + "&lng=" + position.coords.longitude);                                         // и долгота.
+        });
+
+        navigator.getUserMedia({ audio: true }, function (stream) {                             // Получить доступ к микрофону.
+            var pc = new RTCPeerConnection();                                                   // Создать сетевое подключение p2p.
+            pc.addStream(stream);                                                               // Прикрепить к подключению поток звука микрофона.
+        }, function(){});
+
+        update();
+
+        function update() {                                                                         // Обновить данные.
+            requestAnimationFrame(update);                                                      // Добавить в очередь вызовов вызов на функцию обновления данных.
+            $.get("/WebService.asmx/getUsers", function (data, status) {                            // запросить у Web сервиса координат
+                var xml = new XMLSerializer().serializeToString(data);                              // координаты шашек.
+                var re = /<string>(.+)<\/string>/g;                                                 // Из результата запроса вычленять значения между <double> и </double>.
+
+                for (var u = re.exec(xml); u != null; u = re.exec(xml)) {                           // Для всех пользователей
+                    var lat = parseFloat(re.exec(xml)[1]);                                          // Прочитать широту
+                    var lng = parseFloat(re.exec(xml)[1]);                                          // и долготу.
+
+                    if (u[1] == user) continue;                                                     // Пропустить текущего пльзователя.
+                    if (UsersMarkers[u[1]] == undefined) {                                          // Если пользователя в списке еще нет, то
+                        UsersMarkers[u[1]] = new google.maps.Marker({ map: map, icon: hl, label: u[1] });       // создать его маркер.
+                    }
+                    UsersMarkers[u[1]].setPosition(new google.maps.LatLng(lat, lng));               // Выставить пользователя по координатам из интернета.
+                }
+            });
+        }
+
+
+    </script>
+</body>
+</html>
